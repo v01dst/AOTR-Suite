@@ -45,6 +45,7 @@ $modules = [ordered]@{
 	"Waves"           = Join-Path $src "Features\Waves.lua"
 	"ShadowBan"       = Join-Path $src "Features\ShadowBan.lua"
 	"FallbackUI"      = Join-Path $src "FallbackUI.lua"
+	"Diagnostics"     = Join-Path $src "Diagnostics.lua"
 	"Hub"             = Join-Path $src "Hub.lua"
 	"main"            = Join-Path $src "main.lua"
 }

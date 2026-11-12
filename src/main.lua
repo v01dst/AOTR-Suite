@@ -1,7 +1,9 @@
 --[[
 	AOTR Suite :: main
-	Entry point. Builds the context, boots the interface and starts the
-	feature loops.
+	Entry point.
+
+	The interface is built first so there is always something on screen,
+	every later step runs protected and reports into the diagnostics tab.
 ]]
 
 return function(MOD)
@@ -32,11 +34,6 @@ return function(MOD)
 		state = {},
 	}
 
-	if type(MOD.Rayfield) ~= "table" then
-		Util.warn("the interface library failed to load, the suite cannot start")
-		return nil
-	end
-
 	local function build(name)
 		Ctx[name] = MOD[name](Ctx)
 		return Ctx[name]
@@ -58,6 +55,7 @@ return function(MOD)
 	build("Waves")
 	build("ShadowBan")
 	build("FallbackUI")
+	build("Diagnostics")
 	build("Hub")
 
 	local Config = Ctx.Config
@@ -74,20 +72,46 @@ return function(MOD)
 	local Waves = Ctx.Waves
 	local ShadowBan = Ctx.ShadowBan
 	local Hub = Ctx.Hub
+	local Diagnostics = Ctx.Diagnostics
 
 	------------------------------------------------------------------
-	-- Boot
+	-- Collect what we know before anything can fail
 	------------------------------------------------------------------
 
-	Config.AutoLoad()
-	Ctx.Remotes.resolve(true)
+	Diagnostics.set("executor", Diagnostics.detectExecutor())
+	Diagnostics.set("gameId", game.GameId)
+	Diagnostics.set("placeId", game.PlaceId)
+	Diagnostics.set("player", Players.LocalPlayer and Players.LocalPlayer.Name or "?")
 
-	local uiOk, uiError = pcall(function()
-		Hub.build()
-	end)
-	if not uiOk then
-		Util.warn("the interface could not be created:", tostring(uiError))
+	------------------------------------------------------------------
+	-- Boot, step by step, every step protected
+	------------------------------------------------------------------
+
+	local function step(name, fn)
+		local ok, result = pcall(fn)
+		if not ok then
+			Diagnostics.error(name .. ": " .. tostring(result))
+		end
+		return ok, result
 	end
+
+	step("config", function()
+		Config.AutoLoad()
+		Diagnostics.set("profile", Config.ActiveProfile)
+	end)
+
+	-- The interface comes before the rest, so a window is visible even if
+	-- something later goes wrong.
+	step("interface", function()
+		Hub.build()
+		Diagnostics.set("interface", Hub.providerName())
+	end)
+
+	step("remotes", function()
+		local post, get = Ctx.Remotes.resolve(true)
+		Diagnostics.set("postRemote", post ~= nil)
+		Diagnostics.set("getRemote", get ~= nil)
+	end)
 
 	------------------------------------------------------------------
 	-- Anti AFK
@@ -115,7 +139,7 @@ return function(MOD)
 			end
 		end)
 	end
-	setupAntiAfK()
+	step("anti afk", setupAntiAfK)
 	Config.onChanged(setupAntiAfK)
 
 	------------------------------------------------------------------
@@ -157,7 +181,7 @@ return function(MOD)
 			Combat.update()
 		end)
 		if not ok then
-			Util.warn("heartbeat:", err)
+			Diagnostics.error("heartbeat: " .. tostring(err))
 		end
 	end)
 
@@ -213,6 +237,7 @@ return function(MOD)
 		Running = true,
 		Config = Config,
 		Ctx = Ctx,
+		Diagnostics = Diagnostics,
 		Stop = function()
 			RunService.Heartbeat:Disconnect()
 			if antiAfkConnection then
@@ -220,17 +245,27 @@ return function(MOD)
 			end
 			local window = Hub.window()
 			if window then
-				window:Destroy()
+				pcall(function()
+					window:Destroy()
+				end)
 			end
 			genv.AOTRSuite.Running = false
 		end,
 	}
 
-	Util.log("=============================================")
-	Util.log(" AOTR Suite loaded")
-	Util.log(" interface : " .. tostring(Hub.providerName()))
-	Util.log(" remotes   : " .. (Ctx.Remotes.resolve() and "found" or "not found yet"))
-	Util.log(" profile   : " .. tostring(Config.ActiveProfile))
-	Util.log("=============================================")
+	------------------------------------------------------------------
+	-- Tell the user what happened, on the screen and in the console
+	------------------------------------------------------------------
+
+	local interface = Diagnostics.state.interface or "none"
+	local post = Diagnostics.state.postRemote and "found" or "missing"
+	local message = string.format(
+		"interface: %s | POST remote: %s | profile: %s",
+		interface,
+		post,
+		tostring(Diagnostics.state.profile or "default")
+	)
+	Diagnostics.publish("AOTR Suite loaded", message)
+
 	return genv.AOTRSuite
 end

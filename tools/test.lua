@@ -588,6 +588,25 @@ check("loader refuses to run twice", guardResult.loaded == false and guardResult
 genv.AOTRSuite = nil
 
 --------------------------------------------------------------------------------
+-- Diagnostics
+--------------------------------------------------------------------------------
+
+section("Diagnostics")
+local Diagnostics = loadModule("../src/Diagnostics")({ Util = ctx.Util })
+ctx.Diagnostics = Diagnostics
+
+Diagnostics.set("executor", "Xeno")
+Diagnostics.set("gameId", 4658598196)
+Diagnostics.set("postRemote", true)
+Diagnostics.error("something went wrong")
+local report = Diagnostics.report()
+check("report names the executor", report:find("Xeno", 1, true) ~= nil)
+check("report names the game id", report:find("4658598196", 1, true) ~= nil)
+check("report shows the remote state", report:find("POST remote: found", 1, true) ~= nil)
+check("report lists the errors", report:find("something went wrong", 1, true) ~= nil)
+check("errors are counted", #Diagnostics.state.errors == 1)
+
+--------------------------------------------------------------------------------
 -- Result
 --------------------------------------------------------------------------------
 

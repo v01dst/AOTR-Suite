@@ -571,6 +571,38 @@ return function(Ctx)
 		createSlider(misc, "StreakAmount", { 0, 1000000 }, 1000, "", 0)
 		createToggle(misc, "StreakDie", false)
 
+		--------------------------------------------------------------
+		-- Tab: Diagnostics
+		--------------------------------------------------------------
+		local diagnostics = window:CreateTab("Diagnostics", 0)
+		diagnostics:CreateSection("Boot report")
+		local reportParagraph = diagnostics:CreateParagraph({
+			Name = "Status",
+			Content = "collecting...",
+		})
+		local function refreshReport()
+			pcall(function()
+				reportParagraph:Set({
+					Title = "Status",
+					Content = Ctx.Diagnostics.report(),
+				})
+			end)
+		end
+		diagnostics:CreateButton({
+			Name = "Refresh report",
+			Callback = refreshReport,
+		})
+		diagnostics:CreateButton({
+			Name = "Show on screen",
+			Callback = function()
+				Ctx.Diagnostics.toast("AOTR Suite", Ctx.Diagnostics.report(), 12)
+			end,
+		})
+		diagnostics:CreateParagraph({
+			Name = "Log file",
+			Content = "AOTR_boot_log.txt (next to the executor files)",
+		})
+
 		------------------------------------------------------------------
 		-- Auto save and live stats
 		------------------------------------------------------------------
@@ -597,6 +629,7 @@ return function(Ctx)
 				while true do
 					task.wait(2)
 					pcall(refreshStats)
+					pcall(refreshReport)
 				end
 			end)
 		end

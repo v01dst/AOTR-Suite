@@ -22,6 +22,17 @@ return function(options)
 		log("[AOTR Loader] " .. table.concat(parts, " "))
 	end
 
+	-- A toast on the screen, some executors never show print output.
+	local function toast(title, text)
+		pcall(function()
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = tostring(title),
+				Text = tostring(text),
+				Duration = 6,
+			})
+		end)
+	end
+
 	local function fromUrl(url)
 		if type(url) ~= "string" or url == "" then
 			return nil
@@ -110,10 +121,19 @@ return function(options)
 		report("no source found.")
 		report("put the URL of your hosted AOTR.lua into the url list,")
 		report("or place AOTR.lua in the executor folder as " .. LOCAL_FILE .. ".")
+		toast("AOTR Loader", "No source found. Check the link or place AOTR.lua next to the loader.", 8)
 		return { loaded = false, reason = "no source" }
 	end
 
 	report("source: " .. tostring(origin) .. " (" .. tostring(#source) .. " bytes)")
+	toast("AOTR Loader", "Downloaded " .. tostring(#source) .. " bytes, starting...", 4)
+
+	-- Cache the script so the next run works without a network.
+	if type(writefile) == "function" and LOCAL_FILE ~= "" then
+		pcall(function()
+			writefile(LOCAL_FILE, source)
+		end)
+	end
 
 	------------------------------------------------------------------
 	-- Run
@@ -127,9 +147,11 @@ return function(options)
 	local ok, runtimeError = pcall(chunk)
 	if not ok then
 		report("runtime error: " .. tostring(runtimeError))
+		toast("AOTR Loader", "Runtime error, check the diagnostics tab.", 8)
 		return { loaded = false, reason = "runtime error" }
 	end
 
 	report("done")
+	toast("AOTR Suite", "Loaded.", 5)
 	return { loaded = true, source = source }
 end

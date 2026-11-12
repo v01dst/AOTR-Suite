@@ -9327,6 +9327,152 @@ end
 
 end)())
 
+-- ==== Diagnostics ===============================================
+__define("Diagnostics", (function()
+--[[
+	AOTR Suite :: Diagnostics
+	Collects what happened during the boot so the user can see it.
+
+	Some executors swallow print output, so the report is shown inside the
+	interface, written to a log file and pushed to the screen as a toast.
+]]
+
+return function(Ctx)
+	local Util = Ctx.Util
+	local Diagnostics = {}
+
+	Diagnostics.state = {
+		source = nil,
+		loader = nil,
+		interface = nil,
+		remotes = false,
+		postRemote = false,
+		getRemote = false,
+		gameId = nil,
+		placeId = nil,
+		player = nil,
+		executor = nil,
+		startedAt = Util.now(),
+		errors = {},
+	}
+
+	Diagnostics.set = function(key, value)
+		Diagnostics.state[key] = value
+		return value
+	end
+
+	Diagnostics.error = function(message)
+		table.insert(Diagnostics.state.errors, tostring(message))
+		Util.warn(message)
+		return message
+	end
+
+	------------------------------------------------------------------
+	-- Executor detection
+	------------------------------------------------------------------
+
+	Diagnostics.detectExecutor = function()
+		local names = {}
+		if syn then
+			table.insert(names, "Synapse")
+		end
+		if fluxus then
+			table.insert(names, "Fluxus")
+		end
+		if krnl then
+			table.insert(names, "Krnl")
+		end
+		if delta then
+			table.insert(names, "Delta")
+		end
+		if getexecutorname then
+			local ok, name = pcall(getexecutorname)
+			if ok and type(name) == "string" then
+				table.insert(names, name)
+			end
+		end
+		if identifier then
+			local ok, name = pcall(identifier)
+			if ok and type(name) == "string" then
+				table.insert(names, name)
+			end
+		end
+		return table.concat(names, ", ")
+	end
+
+	------------------------------------------------------------------
+	-- Report
+	------------------------------------------------------------------
+
+	Diagnostics.report = function()
+		local state = Diagnostics.state
+		local lines = {}
+		local function add(label, value)
+			table.insert(lines, string.format("%s: %s", label, tostring(value)))
+		end
+
+		add("executor", state.executor ~= "" and state.executor or "unknown")
+		add("game id", state.gameId or "?")
+		add("place id", state.placeId or "?")
+		add("player", state.player or "?")
+		add("source", state.source or "?")
+		add("interface", state.interface or "?")
+		add("POST remote", state.postRemote and "found" or "missing")
+		add("GET remote", state.getRemote and "found" or "missing")
+		add("config profile", state.profile or "?")
+		add("uptime", Util.formatDuration(Util.now() - state.startedAt))
+
+		if #state.errors > 0 then
+			table.insert(lines, "")
+			table.insert(lines, "errors:")
+			for _, message in ipairs(state.errors) do
+				table.insert(lines, "- " .. message)
+			end
+		end
+
+		return table.concat(lines, "\n")
+	end
+
+	------------------------------------------------------------------
+	-- Output channels
+	------------------------------------------------------------------
+
+	-- The toast is the most visible channel, it shows up on the screen
+	-- even when the console stays empty.
+	Diagnostics.toast = function(title, content, duration)
+		pcall(function()
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = tostring(title),
+				Text = tostring(content),
+				Duration = duration or 6,
+			})
+		end)
+	end
+
+	-- Writes the report next to the executor files when it is possible.
+	Diagnostics.writeLog = function()
+		if type(writefile) ~= "function" then
+			return false
+		end
+		local ok = pcall(function()
+			writefile("AOTR_boot_log.txt", Diagnostics.report())
+		end)
+		return ok
+	end
+
+	-- Prints and shows the report in every channel at once.
+	Diagnostics.publish = function(title, content)
+		Util.log(title)
+		Util.log(content)
+		Diagnostics.toast(title, content, 8)
+		Diagnostics.writeLog()
+	end
+
+	return Diagnostics
+end
+
+end)())
+
 -- ==== Hub ===============================================
 __define("Hub", (function()
 --[[
@@ -9902,6 +10048,38 @@ return function(Ctx)
 		createSlider(misc, "StreakAmount", { 0, 1000000 }, 1000, "", 0)
 		createToggle(misc, "StreakDie", false)
 
+		--------------------------------------------------------------
+		-- Tab: Diagnostics
+		--------------------------------------------------------------
+		local diagnostics = window:CreateTab("Diagnostics", 0)
+		diagnostics:CreateSection("Boot report")
+		local reportParagraph = diagnostics:CreateParagraph({
+			Name = "Status",
+			Content = "collecting...",
+		})
+		local function refreshReport()
+			pcall(function()
+				reportParagraph:Set({
+					Title = "Status",
+					Content = Ctx.Diagnostics.report(),
+				})
+			end)
+		end
+		diagnostics:CreateButton({
+			Name = "Refresh report",
+			Callback = refreshReport,
+		})
+		diagnostics:CreateButton({
+			Name = "Show on screen",
+			Callback = function()
+				Ctx.Diagnostics.toast("AOTR Suite", Ctx.Diagnostics.report(), 12)
+			end,
+		})
+		diagnostics:CreateParagraph({
+			Name = "Log file",
+			Content = "AOTR_boot_log.txt (next to the executor files)",
+		})
+
 		------------------------------------------------------------------
 		-- Auto save and live stats
 		------------------------------------------------------------------
@@ -9928,6 +10106,7 @@ return function(Ctx)
 				while true do
 					task.wait(2)
 					pcall(refreshStats)
+					pcall(refreshReport)
 				end
 			end)
 		end
@@ -9961,8 +10140,10 @@ end)())
 __define("main", (function()
 --[[
 	AOTR Suite :: main
-	Entry point. Builds the context, boots the interface and starts the
-	feature loops.
+	Entry point.
+
+	The interface is built first so there is always something on screen,
+	every later step runs protected and reports into the diagnostics tab.
 ]]
 
 return function(MOD)
@@ -9993,11 +10174,6 @@ return function(MOD)
 		state = {},
 	}
 
-	if type(MOD.Rayfield) ~= "table" then
-		Util.warn("the interface library failed to load, the suite cannot start")
-		return nil
-	end
-
 	local function build(name)
 		Ctx[name] = MOD[name](Ctx)
 		return Ctx[name]
@@ -10019,6 +10195,7 @@ return function(MOD)
 	build("Waves")
 	build("ShadowBan")
 	build("FallbackUI")
+	build("Diagnostics")
 	build("Hub")
 
 	local Config = Ctx.Config
@@ -10035,20 +10212,46 @@ return function(MOD)
 	local Waves = Ctx.Waves
 	local ShadowBan = Ctx.ShadowBan
 	local Hub = Ctx.Hub
+	local Diagnostics = Ctx.Diagnostics
 
 	------------------------------------------------------------------
-	-- Boot
+	-- Collect what we know before anything can fail
 	------------------------------------------------------------------
 
-	Config.AutoLoad()
-	Ctx.Remotes.resolve(true)
+	Diagnostics.set("executor", Diagnostics.detectExecutor())
+	Diagnostics.set("gameId", game.GameId)
+	Diagnostics.set("placeId", game.PlaceId)
+	Diagnostics.set("player", Players.LocalPlayer and Players.LocalPlayer.Name or "?")
 
-	local uiOk, uiError = pcall(function()
-		Hub.build()
-	end)
-	if not uiOk then
-		Util.warn("the interface could not be created:", tostring(uiError))
+	------------------------------------------------------------------
+	-- Boot, step by step, every step protected
+	------------------------------------------------------------------
+
+	local function step(name, fn)
+		local ok, result = pcall(fn)
+		if not ok then
+			Diagnostics.error(name .. ": " .. tostring(result))
+		end
+		return ok, result
 	end
+
+	step("config", function()
+		Config.AutoLoad()
+		Diagnostics.set("profile", Config.ActiveProfile)
+	end)
+
+	-- The interface comes before the rest, so a window is visible even if
+	-- something later goes wrong.
+	step("interface", function()
+		Hub.build()
+		Diagnostics.set("interface", Hub.providerName())
+	end)
+
+	step("remotes", function()
+		local post, get = Ctx.Remotes.resolve(true)
+		Diagnostics.set("postRemote", post ~= nil)
+		Diagnostics.set("getRemote", get ~= nil)
+	end)
 
 	------------------------------------------------------------------
 	-- Anti AFK
@@ -10076,7 +10279,7 @@ return function(MOD)
 			end
 		end)
 	end
-	setupAntiAfK()
+	step("anti afk", setupAntiAfK)
 	Config.onChanged(setupAntiAfK)
 
 	------------------------------------------------------------------
@@ -10118,7 +10321,7 @@ return function(MOD)
 			Combat.update()
 		end)
 		if not ok then
-			Util.warn("heartbeat:", err)
+			Diagnostics.error("heartbeat: " .. tostring(err))
 		end
 	end)
 
@@ -10174,6 +10377,7 @@ return function(MOD)
 		Running = true,
 		Config = Config,
 		Ctx = Ctx,
+		Diagnostics = Diagnostics,
 		Stop = function()
 			RunService.Heartbeat:Disconnect()
 			if antiAfkConnection then
@@ -10181,18 +10385,28 @@ return function(MOD)
 			end
 			local window = Hub.window()
 			if window then
-				window:Destroy()
+				pcall(function()
+					window:Destroy()
+				end)
 			end
 			genv.AOTRSuite.Running = false
 		end,
 	}
 
-	Util.log("=============================================")
-	Util.log(" AOTR Suite loaded")
-	Util.log(" interface : " .. tostring(Hub.providerName()))
-	Util.log(" remotes   : " .. (Ctx.Remotes.resolve() and "found" or "not found yet"))
-	Util.log(" profile   : " .. tostring(Config.ActiveProfile))
-	Util.log("=============================================")
+	------------------------------------------------------------------
+	-- Tell the user what happened, on the screen and in the console
+	------------------------------------------------------------------
+
+	local interface = Diagnostics.state.interface or "none"
+	local post = Diagnostics.state.postRemote and "found" or "missing"
+	local message = string.format(
+		"interface: %s | POST remote: %s | profile: %s",
+		interface,
+		post,
+		tostring(Diagnostics.state.profile or "default")
+	)
+	Diagnostics.publish("AOTR Suite loaded", message)
+
 	return genv.AOTRSuite
 end
 
