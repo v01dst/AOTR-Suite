@@ -662,6 +662,68 @@ return function(Ctx)
 	end
 
 	------------------------------------------------------------------
+	-- Banner
+	------------------------------------------------------------------
+	-- A small label that is shown the moment the script starts, so it is
+	-- visible even when the interface itself cannot be built.
+
+	Fallback.Banner = function(_, text)
+		local ok, host = pcall(function()
+			return (gethui and gethui()) or game:GetService("CoreGui")
+		end)
+		if not ok or not host then
+			host = game:GetService("CoreGui")
+		end
+		pcall(function()
+			if host:IsA("ScreenGui") then
+				host = host.Parent or game:GetService("CoreGui")
+			end
+		end)
+
+		local banner = nil
+		pcall(function()
+			banner = new("ScreenGui", {
+				Name = "AOTRBanner",
+				ResetOnSpawn = false,
+				DisplayOrder = 10001,
+			})
+			banner.Parent = host
+
+			local label = new("TextLabel", {
+				BackgroundColor3 = rgb(28, 28, 34),
+				Text = tostring(text or "AOTR Suite"),
+				TextColor3 = rgb(120, 170, 255),
+				TextSize = 14,
+				Size = UDim2.fromOffset(240, 32),
+				Position = UDim2.fromOffset(12, 12),
+			})
+			label.Parent = banner
+			corner(label, 6)
+			stroke(label)
+		end)
+
+		return {
+			Destroy = function()
+				pcall(function()
+					if banner then
+						banner:Destroy()
+					end
+				end)
+			end,
+			SetText = function(newText)
+				pcall(function()
+					if banner then
+						local label = banner:GetChildren()[1]
+						if label then
+							label.Text = tostring(newText)
+						end
+					end
+				end)
+			end,
+		}
+	end
+
+	------------------------------------------------------------------
 	-- Last resort
 	------------------------------------------------------------------
 	-- If even the built in interface cannot be created, at least the

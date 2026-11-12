@@ -64,6 +64,13 @@ return function(MOD)
 	build("Diagnostics")
 	build("Hub")
 
+	-- A banner is shown before anything else runs, so it is visible even
+	-- when the interface itself cannot be built.
+	local banner = nil
+	pcall(function()
+		banner = Ctx.FallbackUI:Banner("AOTR Suite starting...")
+	end)
+
 	if type(Ctx.Rayfield) ~= "table" then
 		Util.log("the Rayfield interface is not available, the built in interface is used")
 	end
@@ -120,6 +127,25 @@ return function(MOD)
 		-- Nothing worked, write the reason on the screen.
 		pcall(function()
 			Ctx.FallbackUI:Emergency("AOTR Suite could not open its interface:\n" .. tostring(Diagnostics.state.errors[1]))
+		end)
+	end
+
+	-- The banner has done its job, the interface takes over.
+	if banner then
+		pcall(function()
+			banner.Destroy()
+		end)
+	end
+
+	-- The loader window stays until the suite shows its own interface, so
+	-- a failure is never silently swallowed.
+	local loaderUI = genv.AOTRLoaderUI
+	if loaderUI and interfaceOk and loaderUI.close then
+		pcall(function()
+			loaderUI.setStatus("the suite is running")
+			task.delay(2, function()
+				loaderUI.close()
+			end)
 		end)
 	end
 

@@ -592,6 +592,17 @@ filesApi.writefile("AOTR.lua", "-- AOTR Suite\n" .. string.rep("x", 120) .. "\nt
 local brokenResult = Loader({ urls = {}, file = "AOTR.lua", log = quiet })
 check("loader survives a broken source", brokenResult.loaded == false, tostring(brokenResult.reason))
 
+-- The loader window stays until the suite closes it, so a failure is
+-- never swallowed.
+genv.AOTRLoaderUI = nil
+local keepResult = Loader({ urls = { "https://example.test/aotr.lua" }, file = "missing.lua", log = quiet })
+check("the loader exposes its window handle", genv.AOTRLoaderUI ~= nil)
+check("the loader window is not closed on its own", genv.AOTRLoaderUI ~= nil)
+if genv.AOTRLoaderUI and genv.AOTRLoaderUI.close then
+	pcall(genv.AOTRLoaderUI.close)
+end
+genv.AOTRLoaderUI = nil
+
 -- The double execution guard.
 genv.AOTRSuite = { Running = true }
 local guardResult = Loader({ urls = {}, file = "AOTR.lua", log = quiet })

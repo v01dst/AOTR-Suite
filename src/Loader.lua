@@ -39,6 +39,7 @@ return function(options)
 	local gui = nil
 	local statusLabel = nil
 	local detailsLabel = nil
+	local handle = nil
 
 	local function paint()
 		if not statusLabel then
@@ -101,9 +102,23 @@ return function(options)
 			title.TextColor3 = Color3.fromRGB(235, 235, 240)
 			title.TextSize = 15
 			title.TextXAlignment = Enum.TextXAlignment.Left
-			title.Size = UDim2.new(1, -24, 0, 24)
+			title.Size = UDim2.new(1, -60, 0, 24)
 			title.Position = UDim2.fromOffset(12, 8)
 			title.Parent = frame
+
+			local close = Instance.new("TextButton")
+			close.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+			close.Text = "X"
+			close.TextColor3 = Color3.fromRGB(200, 200, 210)
+			close.TextSize = 13
+			close.Size = UDim2.fromOffset(24, 20)
+			close.Position = UDim2.new(1, -30, 0, 8)
+			close.Parent = frame
+			close.MouseButton1Click:Connect(function()
+				if handle then
+					handle.close()
+				end
+			end)
 
 			statusLabel = Instance.new("TextLabel")
 			statusLabel.BackgroundTransparency = 1
@@ -284,10 +299,29 @@ return function(options)
 	------------------------------------------------------------------
 
 	buildGui()
+
+	-- The handle exists from the start so the close button always works,
+	-- even when the script fails.
+	handle = {
+		close = function()
+			pcall(function()
+				if gui then
+					gui:Destroy()
+				end
+			end)
+			gui = nil
+			statusLabel = nil
+			detailsLabel = nil
+		end,
+		setStatus = setStatus,
+		note = note,
+	}
+	local genv = (getgenv and getgenv()) or _G
+	genv.AOTRLoaderUI = handle
+
 	setStatus("looking for the script")
 	note("executor: " .. tostring(options.executor or detectExecutor()))
 
-	local genv = (getgenv and getgenv()) or _G
 	if genv.AOTRSuite and genv.AOTRSuite.Running then
 		setStatus("already running")
 		note("the suite is already running")
@@ -382,16 +416,6 @@ return function(options)
 	setStatus("the suite is running")
 	note("done")
 	report("done")
-
-	-- Hand the window over to the suite, it shows its own interface.
-	task.spawn(function()
-		task.wait(2)
-		pcall(function()
-			if gui then
-				gui:Destroy()
-			end
-		end)
-	end)
 
 	return { loaded = true, source = source }
 end

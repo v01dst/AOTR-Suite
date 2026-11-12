@@ -9340,6 +9340,68 @@ return function(Ctx)
 	end
 
 	------------------------------------------------------------------
+	-- Banner
+	------------------------------------------------------------------
+	-- A small label that is shown the moment the script starts, so it is
+	-- visible even when the interface itself cannot be built.
+
+	Fallback.Banner = function(_, text)
+		local ok, host = pcall(function()
+			return (gethui and gethui()) or game:GetService("CoreGui")
+		end)
+		if not ok or not host then
+			host = game:GetService("CoreGui")
+		end
+		pcall(function()
+			if host:IsA("ScreenGui") then
+				host = host.Parent or game:GetService("CoreGui")
+			end
+		end)
+
+		local banner = nil
+		pcall(function()
+			banner = new("ScreenGui", {
+				Name = "AOTRBanner",
+				ResetOnSpawn = false,
+				DisplayOrder = 10001,
+			})
+			banner.Parent = host
+
+			local label = new("TextLabel", {
+				BackgroundColor3 = rgb(28, 28, 34),
+				Text = tostring(text or "AOTR Suite"),
+				TextColor3 = rgb(120, 170, 255),
+				TextSize = 14,
+				Size = UDim2.fromOffset(240, 32),
+				Position = UDim2.fromOffset(12, 12),
+			})
+			label.Parent = banner
+			corner(label, 6)
+			stroke(label)
+		end)
+
+		return {
+			Destroy = function()
+				pcall(function()
+					if banner then
+						banner:Destroy()
+					end
+				end)
+			end,
+			SetText = function(newText)
+				pcall(function()
+					if banner then
+						local label = banner:GetChildren()[1]
+						if label then
+							label.Text = tostring(newText)
+						end
+					end
+				end)
+			end,
+		}
+	end
+
+	------------------------------------------------------------------
 	-- Last resort
 	------------------------------------------------------------------
 	-- If even the built in interface cannot be created, at least the
@@ -10262,6 +10324,13 @@ return function(MOD)
 	build("Diagnostics")
 	build("Hub")
 
+	-- A banner is shown before anything else runs, so it is visible even
+	-- when the interface itself cannot be built.
+	local banner = nil
+	pcall(function()
+		banner = Ctx.FallbackUI:Banner("AOTR Suite starting...")
+	end)
+
 	if type(Ctx.Rayfield) ~= "table" then
 		Util.log("the Rayfield interface is not available, the built in interface is used")
 	end
@@ -10318,6 +10387,25 @@ return function(MOD)
 		-- Nothing worked, write the reason on the screen.
 		pcall(function()
 			Ctx.FallbackUI:Emergency("AOTR Suite could not open its interface:\n" .. tostring(Diagnostics.state.errors[1]))
+		end)
+	end
+
+	-- The banner has done its job, the interface takes over.
+	if banner then
+		pcall(function()
+			banner.Destroy()
+		end)
+	end
+
+	-- The loader window stays until the suite shows its own interface, so
+	-- a failure is never silently swallowed.
+	local loaderUI = genv.AOTRLoaderUI
+	if loaderUI and interfaceOk and loaderUI.close then
+		pcall(function()
+			loaderUI.setStatus("the suite is running")
+			task.delay(2, function()
+				loaderUI.close()
+			end)
 		end)
 	end
 
