@@ -2,24 +2,39 @@
  AOTR Suite — loadstring snippets
 ================================================================================
 
-الملف الجاهز للرفع:  dist\AOTR.lua
-الرابط المنشور:      https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua
-المستودع:           https://github.com/v01dst/AOTR-Suite
+الملفات الجاهزة:
+  dist\AOTR.lua              (352 KB)  النسخة الكاملة، فيها Rayfield
+  dist\AOTR-standalone.lua   (158 KB)  بدون أي مكتبة خارجية — تلصقها مباشرة
+  dist\loader.lua            (11 KB)  اللودر
+
+الرابط المنشور:
+  https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR-standalone.lua
 
 
-1) من الرابط المنشور (أسهل طريقة)
+1) الأسهل — السكربت المدمج (بدون لودر، بدون تحميل)
 --------------------------------------------------------------------------------
-loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR-standalone.lua"))()
 
 
-2) من ملف محلي في مجلد الـ executor
+2) اللودر (يفتح نافذة على الشاشة تعرض كل خطوة)
+--------------------------------------------------------------------------------
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/loader.lua"))()
+
+اللودر بيحاول بالترتيب:
+  1. game:HttpGet
+  2. game.HttpGet
+  3. كل اسم معروف لـ http client في الـ executors (syn/fluxus/http/krnl/delta/http_request/request)
+  4. ملف AOTR.lua الموجود في مجلد الـ executor
+وبيقبل الملف لو طلع HTML بدل Lua (فحص العلامة AOTR Suite)، وكامّل مرة واحدة
+عند أول تحميل.
+
+
+3) من ملف محلي في مجلد الـ executor
 --------------------------------------------------------------------------------
 loadstring(readfile("AOTR.lua"))()
 
-(ضع dist\AOTR.lua في مجلد الـ executor أولاً)
 
-
-3) مع إعدادات قبل التشغيل
+4) مع إعدادات قبل التشغيل
 --------------------------------------------------------------------------------
 getgenv().TekkitConfig = {
 	AutoFarm = true,
@@ -32,42 +47,23 @@ getgenv().TekkitConfig = {
 	Webhook = true,
 	WebhookLink = "https://discord.com/api/webhooks/...",
 }
-loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
-
-
-4) اللودر الكامل (رابط ثم ملف محلي، مع منع التشغيل المزدوج)
---------------------------------------------------------------------------------
-loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/loader.lua"))()
-
-(الرابط أعلاه يجلب اللودر، واللودر يجلب السكربت)
-
-
-5) لودر محلي
---------------------------------------------------------------------------------
-loadstring(readfile("loader.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR-standalone.lua"))()
 
 
 ================================================================================
- الحفظ التلقائي (Auto Execute)
+ ملاحظة عن لزوم stand-alone
 ================================================================================
 
-حط ملف loader.lua في مجلد التنفيذ التلقائي للـ executor. اللودر يمنع التشغيل
-المزدوج تلقائياً، والسكربت نفسه فيه حماية ثانية (getgenv().AOTRSuite.Running).
-
-لتحديث السكربت: ارفع dist\AOTR.lua إلى المستودع على الفرع main، فيتحدث
-الرابط تلقائياً بدون أي تعديل على اللودر.
+لأغلب الـ executors (ومنهم Xeno) الـ game:GetObjects محجوب، وRayfield بيعتمد
+عليه لتحميل نافذته، فبيسقط. النسخة standalone مبنية بـ Instance.new بس
+وبتشتغل في أي executor. لو الـ executor بتاعك سمح بـ GetObjects، النسخة
+الكاملة (AOTR.lua) هي الأحلى شكلاً.
 
 
 ================================================================================
- ملاحظة عن النشر على مستودعك أنت
+ تحديث السكربت
 ================================================================================
 
-الرابط أعلاه يشير إلى حساب v01dst. لو أردت نسختك أنت:
-
-  1. Fork المستودع:
-     https://github.com/v01dst/AOTR-Suite/fork
-  2. عدّل dist\loader.lua (أو tools\build.ps1) ليشير إلى رابطك:
-     https://raw.githubusercontent.com/<YOUR_USER>/AOTR-Suite/main/dist/AOTR.lua
-  3. ابنِ وأعد الرفع:
-     powershell -ExecutionPolicy Bypass -File tools\build.ps1
-     git add -A && git commit -m "update" && git push
+ارفع dist\AOTR-standalone.lua إلى المستودع على الفرع main، فيتحدث الرابط
+تلقائياً بدون أي تعديل عند المستخدمين. اللودر كمان بيخزّن الملف محلياً بعد
+أول تحميل، فالتشغيل الجاي بيشتغل حتى بدون نت.

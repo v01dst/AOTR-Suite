@@ -15,51 +15,42 @@
 
 ### الروابط المنشورة
 
-| الملف | الرابط |
-|---|---|
-| السكربت | `https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua` |
-| اللودر | `https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/loader.lua` |
-| المستودع | `https://github.com/v01dst/AOTR-Suite` |
+| الملف | الرابط | الحجم |
+|---|---|---|
+| **standalone (موصى به)** | `https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR-standalone.lua` | 158 KB |
+| النسخة الكاملة (Rayfield) | `https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua` | 352 KB |
+| اللودر | `https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/loader.lua` | 11 KB |
+| المستودع | `https://github.com/v01dst/AOTR-Suite` | — |
 
 ```lua
--- الأسهل
-loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
+-- الأسهل: النسخة standalone، مفيش أي مكتبة خارجية
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR-standalone.lua"))()
 ```
 
-### الطريقة الأولى: اللودر (موصى بها)
+> **ليه standalone؟** Rayfield بيحمّل نافذته من Roblox asset عبر
+> `game:GetObjects("rbxassetid://...")`، وكتير الـ executors (منهم Xeno)
+> بتحجبها فبيسقط. النسخة standalone مبنية بـ `Instance.new` بس وبتشتغل في أي
+> executor. لو الـ executor سمح بـ `GetObjects`، النسخة الكاملة هي الأحلى شكلاً.
 
-انسخ `dist/loader.lua` والصقه في الـ executor. اللودر يبحث عن السكربت بالترتيب:
-أول رابط يعمل في قائمة `urls`، ثم ملف `AOTR.lua` الموجود في مجلد الـ executor.
+### الطريقة الأولى: اللودر (مع تشخيص على الشاشة)
+
+انسخ `dist/loader.lua` والصقه في الـ executor. اللودر يرسم نافذة صغيرة
+تعرض كل محاولة تحميل بالتفصيل، لأن بعض الـ executors بتبلع `print`:
 
 ```lua
--- dist/loader.lua  (الرابط الافتراضي يشير إلى المستودع المنشور)
-__AOTRLoader({
-	urls = {
-		"https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua",
-	},
-	file = "AOTR.lua",
-})
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/loader.lua"))()
 ```
 
-أو مباشرة برابط:
-
-```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
-```
-
-أو من ملف محلي (ضع `AOTR.lua` بجانب الـ executor):
-
-```lua
-loadstring(readfile("AOTR.lua"))()
-```
-
-كل الصيغ جاهزة في `dist/loadstring-snippets.txt`.
+اللودر يبحث بالترتيب: `game:HttpGet` ← `game.HttpGet` ← كل اسم معروف لـ
+http client في الـ executors ← ملف `AOTR.lua` في مجلد الـ executor. وبيرفض
+أي محتوى مش السكربت (فحص العلامة) بدل ما يصرّف صفحة خطأ HTML.
 
 ### الطريقة الثانية: تشغيل مباشر
 
 1. افتح اللعبة `Attack on Titan: Revolution` (GameId `4658598196`).
-2. الصق محتوى `dist/AOTR.lua` في الـ executor ونفّذه.
-3. الواجهة تفتح تلقائياً. تبويب **Config** لحفظ وإدارة البروفايلات.
+2. الصق محتوى `dist/AOTR-standalone.lua` في الـ executor ونفّذه.
+3. الواجهة تفتح تلقائياً. تبويب **Config** لحفظ وإدارة البروفايلات، وتبويب
+   **Diagnostics** يعرض حالة التشغيل والأخطاء.
 
 للتشغيل بملف إعدادات خارجي (متوافق مع Tekkit Hub):
 
@@ -151,10 +142,14 @@ C:\AOTR-Script\
 ### أوامر التطوير
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\build.ps1   # بناء dist\AOTR.lua و dist\loader.lua
+powershell -ExecutionPolicy Bypass -File tools\build.ps1   # بناء dist (4 ملفات)
 powershell -ExecutionPolicy Bypass -File tools\check.ps1    # فحص الصياغة + توصيل الوحدات + الحزمة
-tools\luau\luau.exe tools\test.lua                          # 43 اختبار منطقي
+tools\luau\luau.exe tools\test.lua                          # 91 اختبار
 ```
+
+**مهم:** الاختبارات تشمل تشغيل **الحزمة الحقيقية** (`dist/AOTR.mod.lua`) تحت
+محاكي لـ Roblox API (`tools/robloxmock.lua`)، عشان الأخطاء اللي بتحصل جوه
+اللعبة بس (زي `TextLabel` مالهاوش حدث `InputBegan`) تتكشّف قبل النشر.
 
 ---
 
