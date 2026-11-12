@@ -13,16 +13,29 @@
 
 ## 1. التشغيل / Usage
 
+### الروابط المنشورة
+
+| الملف | الرابط |
+|---|---|
+| السكربت | `https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua` |
+| اللودر | `https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/loader.lua` |
+| المستودع | `https://github.com/v01dst/AOTR-Suite` |
+
+```lua
+-- الأسهل
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
+```
+
 ### الطريقة الأولى: اللودر (موصى بها)
 
 انسخ `dist/loader.lua` والصقه في الـ executor. اللودر يبحث عن السكربت بالترتيب:
 أول رابط يعمل في قائمة `urls`، ثم ملف `AOTR.lua` الموجود في مجلد الـ executor.
 
 ```lua
--- dist/loader.lua  (ضع رابطك داخل urls)
+-- dist/loader.lua  (الرابط الافتراضي يشير إلى المستودع المنشور)
 __AOTRLoader({
 	urls = {
-		"https://raw.githubusercontent.com/USER/REPO/main/AOTR.lua",
+		"https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua",
 	},
 	file = "AOTR.lua",
 })
@@ -31,7 +44,7 @@ __AOTRLoader({
 أو مباشرة برابط:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/USER/REPO/main/AOTR.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
 ```
 
 أو من ملف محلي (ضع `AOTR.lua` بجانب الـ executor):

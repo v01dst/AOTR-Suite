@@ -128,7 +128,7 @@ end)()
 
 __AOTRLoader({
 	urls = {
-		-- "https://raw.githubusercontent.com/USER/REPO/main/AOTR.lua",
+		"https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua",
 	},
 	file = "AOTR.lua",
 })

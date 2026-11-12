@@ -2,12 +2,14 @@
  AOTR Suite — loadstring snippets
 ================================================================================
 
-الملف الجاهز للالرفع:  dist\AOTR.lua
+الملف الجاهز للرفع:  dist\AOTR.lua
+الرابط المنشور:      https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua
+المستودع:           https://github.com/v01dst/AOTR-Suite
 
 
-1) من رابط (الأشهر)
+1) من الرابط المنشور (أسهل طريقة)
 --------------------------------------------------------------------------------
-loadstring(game:HttpGet("https://raw.githubusercontent.com/USER/REPO/main/AOTR.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
 
 
 2) من ملف محلي في مجلد الـ executor
@@ -30,45 +32,42 @@ getgenv().TekkitConfig = {
 	Webhook = true,
 	WebhookLink = "https://discord.com/api/webhooks/...",
 }
-loadstring(game:HttpGet("RAW_LINK"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/AOTR.lua"))()
 
 
-4) من ملف خارجي (بدون رفع للسحابة)
+4) اللودر الكامل (رابط ثم ملف محلي، مع منع التشغيل المزدوج)
 --------------------------------------------------------------------------------
-loadstring(readfile("AOTR.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/v01dst/AOTR-Suite/main/dist/loader.lua"))()
+
+(الرابط أعلاه يجلب اللودر، واللودر يجلب السكربت)
 
 
-5) لودر كامل مع بحث تلقائي (رابط ثم ملف محلي)
+5) لودر محلي
 --------------------------------------------------------------------------------
--- استخدم dist\loader.lua كما هو، وضع رابطك في قائمة URLS
 loadstring(readfile("loader.lua"))()
-
-
-================================================================================
- رفع الملف على رابط — أسهل طريق
-================================================================================
-
-GitHub Gist (مجاني، بدون حساب فردي):
-  1. افتح https://gist.github.com
-  2. أنشئ gist جديداً، الصق محتوى dist\AOTR.lua، احفظ
-  3. اضغط "Raw" على الملف → انسخ الرابط
-  4. الرابط يكون بالشكل:
-     https://gist.githubusercontent.com/<USER>/<ID>/raw/<HASH>/AOTR.lua
-  5. ضعه في قائمة URLS داخل dist\loader.lua، أو استخدم السطر (1) مباشرة
-
-Pastebin:
-  1. ارفع dist\AOTR.lua على pastebin (raw paste)
-  2. انسخ الرابط الخام الذي يبدأ بـ https://pastebin.com/raw/
-  3. استخدم السطر (1) مع ذلك الرابط
-
-ملاحظة: بعض الـ executors تمنع game:HttpGet على gist، ووقتها استخدم
-الطريقة (2) أو (5).
 
 
 ================================================================================
  الحفظ التلقائي (Auto Execute)
 ================================================================================
 
-حط dist\loader.lua في مجلد التنفيذ التلقائي للـ executor، وغيّر URLS
-ليربط الملف المضيف. اللودر يمنع التشغيل المزدوج تلقائياً، والسكربت نفسه
-فيه حماية ثانية (getgenv().AOTRSuite.Running).
+حط ملف loader.lua في مجلد التنفيذ التلقائي للـ executor. اللودر يمنع التشغيل
+المزدوج تلقائياً، والسكربت نفسه فيه حماية ثانية (getgenv().AOTRSuite.Running).
+
+لتحديث السكربت: ارفع dist\AOTR.lua إلى المستودع على الفرع main، فيتحدث
+الرابط تلقائياً بدون أي تعديل على اللودر.
+
+
+================================================================================
+ ملاحظة عن النشر على مستودعك أنت
+================================================================================
+
+الرابط أعلاه يشير إلى حساب v01dst. لو أردت نسختك أنت:
+
+  1. Fork المستودع:
+     https://github.com/v01dst/AOTR-Suite/fork
+  2. عدّل dist\loader.lua (أو tools\build.ps1) ليشير إلى رابطك:
+     https://raw.githubusercontent.com/<YOUR_USER>/AOTR-Suite/main/dist/AOTR.lua
+  3. ابنِ وأعد الرفع:
+     powershell -ExecutionPolicy Bypass -File tools\build.ps1
+     git add -A && git commit -m "update" && git push
