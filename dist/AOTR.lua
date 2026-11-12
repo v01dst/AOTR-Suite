@@ -15,7 +15,8 @@ local function __define(name, chunk)
 end
 
 -- ==== Rayfield ===============================================
-__define("Rayfield", (function()
+do
+	local ok, library = pcall(function()
 --[[
 
 	Rayfield Interface Suite
@@ -4668,7 +4669,14 @@ end)
 
 return RayfieldLibrary
 
-end)())
+	end)
+	if ok and type(library) == "table" then
+		__define("Rayfield", library)
+	else
+		print("[AOTR] the Rayfield interface could not be loaded, the built in interface is used")
+		__define("Rayfield", nil)
+	end
+end
 
 -- ==== Util ===============================================
 __define("Util", (function()
@@ -9322,6 +9330,47 @@ return function(Ctx)
 		return window
 	end
 
+	------------------------------------------------------------------
+	-- Last resort
+	------------------------------------------------------------------
+	-- If even the built in interface cannot be created, at least the
+	-- error is written on the screen.
+
+	Fallback.Emergency = function(_, text)
+		local ok, host = pcall(function()
+			return (gethui and gethui()) or game:GetService("CoreGui")
+		end)
+		if not ok or not host then
+			host = game:GetService("CoreGui")
+		end
+		pcall(function()
+			if host:IsA("ScreenGui") then
+				host = host.Parent or game:GetService("CoreGui")
+			end
+		end)
+		pcall(function()
+			local gui = new("ScreenGui", {
+				Name = "AOTREmergency",
+				ResetOnSpawn = false,
+				DisplayOrder = 10000,
+			})
+			gui.Parent = host
+
+			local label = new("TextLabel", {
+				BackgroundColor3 = Color3.fromRGB(40, 20, 20),
+				Text = tostring(text),
+				TextColor3 = Color3.fromRGB(255, 180, 180),
+				TextSize = 14,
+				TextWrapped = true,
+				Size = UDim2.new(0, 460, 0, 150),
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+			})
+			label.Parent = gui
+			corner(label, 8)
+		end)
+	end
+
 	return Fallback
 end
 
@@ -10198,6 +10247,10 @@ return function(MOD)
 	build("Diagnostics")
 	build("Hub")
 
+	if type(Ctx.Rayfield) ~= "table" then
+		Util.log("the Rayfield interface is not available, the built in interface is used")
+	end
+
 	local Config = Ctx.Config
 	local GameUI = Ctx.GameUI
 	local Stats = Ctx.Stats
@@ -10242,10 +10295,16 @@ return function(MOD)
 
 	-- The interface comes before the rest, so a window is visible even if
 	-- something later goes wrong.
-	step("interface", function()
+	local interfaceOk = step("interface", function()
 		Hub.build()
 		Diagnostics.set("interface", Hub.providerName())
 	end)
+	if not interfaceOk then
+		-- Nothing worked, write the reason on the screen.
+		pcall(function()
+			Ctx.FallbackUI:Emergency("AOTR Suite could not open its interface:\n" .. tostring(Diagnostics.state.errors[1]))
+		end)
+	end
 
 	step("remotes", function()
 		local post, get = Ctx.Remotes.resolve(true)

@@ -652,5 +652,46 @@ return function(Ctx)
 		return window
 	end
 
+	------------------------------------------------------------------
+	-- Last resort
+	------------------------------------------------------------------
+	-- If even the built in interface cannot be created, at least the
+	-- error is written on the screen.
+
+	Fallback.Emergency = function(_, text)
+		local ok, host = pcall(function()
+			return (gethui and gethui()) or game:GetService("CoreGui")
+		end)
+		if not ok or not host then
+			host = game:GetService("CoreGui")
+		end
+		pcall(function()
+			if host:IsA("ScreenGui") then
+				host = host.Parent or game:GetService("CoreGui")
+			end
+		end)
+		pcall(function()
+			local gui = new("ScreenGui", {
+				Name = "AOTREmergency",
+				ResetOnSpawn = false,
+				DisplayOrder = 10000,
+			})
+			gui.Parent = host
+
+			local label = new("TextLabel", {
+				BackgroundColor3 = Color3.fromRGB(40, 20, 20),
+				Text = tostring(text),
+				TextColor3 = Color3.fromRGB(255, 180, 180),
+				TextSize = 14,
+				TextWrapped = true,
+				Size = UDim2.new(0, 460, 0, 150),
+				Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+			})
+			label.Parent = gui
+			corner(label, 8)
+		end)
+	end
+
 	return Fallback
 end

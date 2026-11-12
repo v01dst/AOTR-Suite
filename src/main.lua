@@ -58,6 +58,10 @@ return function(MOD)
 	build("Diagnostics")
 	build("Hub")
 
+	if type(Ctx.Rayfield) ~= "table" then
+		Util.log("the Rayfield interface is not available, the built in interface is used")
+	end
+
 	local Config = Ctx.Config
 	local GameUI = Ctx.GameUI
 	local Stats = Ctx.Stats
@@ -102,10 +106,16 @@ return function(MOD)
 
 	-- The interface comes before the rest, so a window is visible even if
 	-- something later goes wrong.
-	step("interface", function()
+	local interfaceOk = step("interface", function()
 		Hub.build()
 		Diagnostics.set("interface", Hub.providerName())
 	end)
+	if not interfaceOk then
+		-- Nothing worked, write the reason on the screen.
+		pcall(function()
+			Ctx.FallbackUI:Emergency("AOTR Suite could not open its interface:\n" .. tostring(Diagnostics.state.errors[1]))
+		end)
+	end
 
 	step("remotes", function()
 		local post, get = Ctx.Remotes.resolve(true)

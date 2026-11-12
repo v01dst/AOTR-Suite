@@ -73,12 +73,22 @@ Add-Line "	__MOD[name] = chunk"
 Add-Line "end"
 Add-Line ""
 
-# Rayfield first, the hub needs it.
+# Rayfield first, the hub needs it. The library is loaded inside a pcall,
+# because it fetches its window from a Roblox asset at load time and a lot
+# of executors block that call. A failure must not take the suite down.
 $rayfield = Read-Lua (Join-Path $vendor "source.lua")
 Add-Line "-- ==== Rayfield ==============================================="
-Add-Line "__define(""Rayfield"", (function()"
+Add-Line "do"
+Add-Line "	local ok, library = pcall(function()"
 Add-Line $rayfield
-Add-Line "end)())"
+Add-Line "	end)"
+Add-Line "	if ok and type(library) == ""table"" then"
+Add-Line "		__define(""Rayfield"", library)"
+Add-Line "	else"
+Add-Line "		print(""[AOTR] the Rayfield interface could not be loaded, the built in interface is used"")"
+Add-Line "		__define(""Rayfield"", nil)"
+Add-Line "	end"
+Add-Line "end"
 Add-Line ""
 
 foreach ($entry in $modules.GetEnumerator()) {
