@@ -57,6 +57,7 @@ return function(MOD)
 	build("AutoStart")
 	build("Waves")
 	build("ShadowBan")
+	build("FallbackUI")
 	build("Hub")
 
 	local Config = Ctx.Config
@@ -81,7 +82,12 @@ return function(MOD)
 	Config.AutoLoad()
 	Ctx.Remotes.resolve(true)
 
-	Hub.build()
+	local uiOk, uiError = pcall(function()
+		Hub.build()
+	end)
+	if not uiOk then
+		Util.warn("the interface could not be created:", tostring(uiError))
+	end
 
 	------------------------------------------------------------------
 	-- Anti AFK
@@ -220,6 +226,11 @@ return function(MOD)
 		end,
 	}
 
-	Util.log("AOTR Suite ready")
+	Util.log("=============================================")
+	Util.log(" AOTR Suite loaded")
+	Util.log(" interface : " .. tostring(Hub.providerName()))
+	Util.log(" remotes   : " .. (Ctx.Remotes.resolve() and "found" or "not found yet"))
+	Util.log(" profile   : " .. tostring(Config.ActiveProfile))
+	Util.log("=============================================")
 	return genv.AOTRSuite
 end

@@ -41,12 +41,37 @@ return function(options)
 		if type(url) ~= "string" or url == "" then
 			return nil
 		end
+		-- game:HttpGet is the first choice, it is the one that works in
+		-- every executor.
 		local ok, source = pcall(function()
 			return game:HttpGet(url)
 		end)
 		if ok and type(source) == "string" and #source > 0 then
 			return source
 		end
+
+		-- Some executors patch game:HttpGet, their own http client still
+		-- works. This is the usual fix for a script that stays empty.
+		local request = (syn and syn.request)
+			or (fluxus and fluxus.request)
+			or (http and http.request)
+			or (krnl and krnl.request)
+			or (delta and delta.request)
+			or http_request
+			or request
+		if type(request) == "function" then
+			local requestOk, response = pcall(request, {
+				Url = url,
+				Method = "GET",
+			})
+			if requestOk and type(response) == "table" then
+				local body = response.Body or response.body or response.Text
+				if type(body) == "string" and #body > 0 then
+					return body
+				end
+			end
+		end
+
 		return nil
 	end
 

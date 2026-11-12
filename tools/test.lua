@@ -564,6 +564,18 @@ check("loader falls back to the local file", fileResult.loaded == true and loade
 local emptyResult = Loader({ urls = {}, file = "does-not-exist.lua", log = quiet })
 check("loader reports a missing source", emptyResult.loaded == false and emptyResult.reason == "no source")
 
+-- When game:HttpGet is patched the executor http client is used instead.
+local requestedUrl = nil
+request = function(options)
+	requestedUrl = options and options.Url
+	return { Body = "loadedFromRequest = true", StatusCode = 200 }
+end
+loadedFromRequest = nil
+local requestResult = Loader({ urls = { "https://example.test/patched.lua" }, file = "missing.lua", log = quiet })
+check("loader falls back to the executor http client", requestResult.loaded == true and loadedFromRequest == true, tostring(requestResult.reason))
+check("the executor http client got the url", requestedUrl == "https://example.test/patched.lua", tostring(requestedUrl))
+request = nil
+
 -- A broken source is reported and does not crash the loader.
 filesApi.writefile("AOTR.lua", "this is not lua ===")
 local brokenResult = Loader({ urls = {}, file = "AOTR.lua", log = quiet })

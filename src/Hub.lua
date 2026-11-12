@@ -24,6 +24,7 @@ return function(Ctx)
 	local saveTimer = 0
 	local loopsStarted = false
 	local newProfileName = ""
+	local uiProvider = nil
 
 	-- Every control that mirrors a config value, so it can be refreshed.
 	local bindings = {}
@@ -37,7 +38,11 @@ return function(Ctx)
 	end
 
 	local function notify(title, content, duration)
-		Rayfield:Notify({
+		local provider = uiProvider or Rayfield
+		if not provider then
+			return
+		end
+		provider:Notify({
 			Title = title,
 			Content = content,
 			Duration = duration or 4,
@@ -201,7 +206,7 @@ return function(Ctx)
 	------------------------------------------------------------------
 
 	Hub.build = function()
-		window = Rayfield:CreateWindow({
+		local windowSettings = {
 			Name = "AOTR Suite | Attack on Titan: Revolution",
 			LoadingTitle = "AOTR Suite",
 			LoadingSubtitle = "Attack on Titan: Revolution",
@@ -209,7 +214,32 @@ return function(Ctx)
 				Enabled = false,
 			},
 			KeySystem = false,
-		})
+		}
+
+		-- Rayfield loads its window from a Roblox asset, and a lot of
+		-- executors block that call. When it fails the built in interface
+		-- takes over so the suite is always visible.
+		local created = nil
+		if Rayfield then
+			local ok, result = pcall(function()
+				return Rayfield:CreateWindow(windowSettings)
+			end)
+			if ok and result then
+				created = result
+				uiProvider = Rayfield
+			else
+				Util.warn("Rayfield could not open a window:", tostring(result))
+			end
+		end
+
+		if not created then
+			Util.warn("using the built in interface")
+			local Fallback = Ctx.FallbackUI
+			created = Fallback:CreateWindow(windowSettings)
+			uiProvider = Fallback
+		end
+
+		window = created
 
 		--------------------------------------------------------------
 		-- Tab: Auto Farm
@@ -576,6 +606,17 @@ return function(Ctx)
 
 	Hub.window = function()
 		return window
+	end
+
+	-- Which interface library ended up being used, shown in the console.
+	Hub.providerName = function()
+		if uiProvider == Rayfield then
+			return "Rayfield"
+		end
+		if uiProvider then
+			return "built in"
+		end
+		return "none"
 	end
 
 	Hub.notify = notify

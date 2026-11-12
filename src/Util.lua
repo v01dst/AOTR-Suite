@@ -32,11 +32,25 @@ return function(Ctx)
 	Util.hasListFiles = type(listfiles) == "function"
 	Util.hasDeleteFile = type(delfile) == "function"
 
+	-- The host of a ScreenGui. Some executors return a ScreenGui from
+	-- gethui, and a ScreenGui cannot parent another ScreenGui, so in that
+	-- case the parent of that ScreenGui is used instead.
 	Util.getGuiHost = function()
 		local ok, host = pcall(function()
 			return (gethui and gethui()) or game:GetService("CoreGui")
 		end)
+		if ok and host and typeof == nil then
+			-- typeof is missing, the host is used as it is.
+			return host
+		end
 		if ok and host then
+			local isScreen = false
+			pcall(function()
+				isScreen = host:IsA("ScreenGui")
+			end)
+			if isScreen then
+				return host.Parent or game:GetService("CoreGui")
+			end
 			return host
 		end
 		return game:GetService("CoreGui")
