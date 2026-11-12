@@ -109,10 +109,37 @@ Add-Line "-- ==== boot =================================================="
 Add-Line "__MOD[""main""](__MOD)"
 
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
-[System.IO.File]::WriteAllText($outFile, $builder.ToString(), $utf8NoBom)
+$bundleText = $builder.ToString()
+[System.IO.File]::WriteAllText($outFile, $bundleText, $utf8NoBom)
 
 $size = [math]::Round((Get-Item $outFile).Length / 1KB, 1)
 Write-Host "built $outFile ($size KB)"
+
+# A second build without the Rayfield interface. It has no dependency at
+# all and fits into any executor console.
+$standaloneFile = Join-Path $dist "AOTR-standalone.lua"
+$rayfieldStart = $bundleText.IndexOf("-- ==== Rayfield ===")
+$rayfieldEnd = $bundleText.IndexOf("-- ==== Util ===")
+if ($rayfieldStart -ge 0 -and $rayfieldEnd -gt $rayfieldStart) {
+	$standaloneText = $bundleText.Substring(0, $rayfieldStart) +
+		"__define(""Rayfield"", nil)" + "`n`n" +
+		$bundleText.Substring($rayfieldEnd)
+	[System.IO.File]::WriteAllText($standaloneFile, $standaloneText, $utf8NoBom)
+	$standaloneSize = [math]::Round((Get-Item $standaloneFile).Length / 1KB, 1)
+	Write-Host "built $standaloneFile ($standaloneSize KB)"
+
+	# The same without the boot line, for the test harness.
+	$standaloneModFile = Join-Path $dist "AOTR-standalone.mod.lua"
+	$standaloneModText = $standaloneText -replace '__MOD\["main"\]\(__MOD\)', 'return __MOD'
+	[System.IO.File]::WriteAllText($standaloneModFile, $standaloneModText, $utf8NoBom)
+}
+
+# The same bundle without the boot line, the test harness runs it under a
+# mock of the Roblox api.
+$moduleFile = Join-Path $dist "AOTR.mod.lua"
+$moduleText = $bundleText -replace '__MOD\["main"\]\(__MOD\)', 'return __MOD'
+[System.IO.File]::WriteAllText($moduleFile, $moduleText, $utf8NoBom)
+Write-Host "built $moduleFile"
 
 # ---------------------------------------------------------------------------
 # The loader is generated from src\Loader.lua so it stays testable, the

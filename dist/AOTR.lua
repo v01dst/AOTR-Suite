@@ -9093,11 +9093,6 @@ return function(Ctx)
 				box.MouseButton1Click:Connect(function()
 					setValue(not state.value)
 				end)
-				text.InputBegan:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						setValue(not state.value)
-					end
-				end)
 
 				return {
 					Set = function(_, newValue)

@@ -688,6 +688,93 @@ local merged = wiringCtx.Util.deepMerge({ a = 1 }, { b = 2 })
 check("the context utilities merge tables", merged.a == 1 and merged.b == 2)
 
 --------------------------------------------------------------------------------
+-- The real bundle under a mock of the Roblox api
+--------------------------------------------------------------------------------
+
+section("The bundle")
+local mock = loadModule("../tools/robloxmock")()
+
+-- The mock replaces the simple stubs of the other sections.
+game = mock.game
+workspace = mock.Workspace
+Instance = mock.Instance
+Enum = mock.Enum
+UDim = mock.UDim
+UDim2 = mock.UDim2
+Vector2 = mock.Vector2
+Vector3 = mock.Vector3
+CFrame = mock.CFrame
+Color3 = mock.Color3
+task = mock.task
+gethui = function()
+	return mock.CoreGui
+end
+typeof = function(value)
+	if type(value) == "table" and rawget(value, "__typename") then
+		return rawget(value, "__typename")
+	end
+	return type(value)
+end
+
+local bundle = require("../dist/AOTR.mod")
+for name, factory in pairs(bundle) do
+	if type(factory) == "function" then
+		setfenv(factory, getfenv(0))
+	end
+end
+check("the bundle exposes every module", type(bundle.main) == "function")
+check("the bundle knows the interface library", bundle.Rayfield == nil or type(bundle.Rayfield) == "table")
+
+local bootOk, bootError = pcall(bundle.main, bundle)
+check("the bundle boots without an error", bootOk == true, tostring(bootError))
+
+-- The interface has to be on the screen after the boot.
+local gui = mock.CoreGui:FindFirstChild("AOTRSuiteUI")
+check("the interface was created", gui ~= nil)
+if gui then
+	local buttons = 0
+	for _, child in ipairs(gui:GetDescendants()) do
+		if child:IsA("TextButton") then
+			buttons = buttons + 1
+		end
+	end
+	check("the interface has buttons", buttons > 10, tostring(buttons))
+	local hasDiagnostics = false
+	for _, child in ipairs(gui:GetDescendants()) do
+		if child:IsA("TextButton") and child.Text == "Diagnostics" then
+			hasDiagnostics = true
+		end
+	end
+	check("the diagnostics tab is there", hasDiagnostics)
+end
+
+-- The suite reports what it found.
+local suite = genv.AOTRSuite
+check("the suite is running", suite ~= nil and suite.Running == true)
+if suite and suite.Diagnostics then
+	local report = suite.Diagnostics.report()
+	check("the report names the interface", report:find("interface:", 1, true) ~= nil)
+	check("the report has no errors", report:find("errors:", 1, true) == nil, report)
+end
+
+-- The loops of the suite run once, an error in them is a real error.
+local problems = mock.runSpawned()
+check("the loops of the suite run without an error", #problems == 0, table.concat(problems, " | "))
+
+-- The build without the Rayfield interface has to work as well.
+local standalone = require("../dist/AOTR-standalone.mod")
+for name, factory in pairs(standalone) do
+	if type(factory) == "function" then
+		setfenv(factory, getfenv(0))
+	end
+end
+local standaloneOk, standaloneError = pcall(standalone.main, standalone)
+check("the standalone build boots without an error", standaloneOk == true, tostring(standaloneError))
+local standaloneGui = mock.CoreGui:FindFirstChild("AOTRSuiteUI")
+check("the standalone build opens the interface", standaloneGui ~= nil)
+check("the standalone build has no Rayfield", standalone.Rayfield == nil)
+
+--------------------------------------------------------------------------------
 -- Result
 --------------------------------------------------------------------------------
 
