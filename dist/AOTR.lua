@@ -8700,15 +8700,24 @@ return function(Ctx)
 	local Util = Ctx.Util
 	local Fallback = {}
 
+	-- The colours are built through a helper so the module can also be
+	-- loaded outside of Roblox, for example in the test harness.
+	local function rgb(red, green, blue)
+		if Color3 and Color3.fromRGB then
+			return Color3.fromRGB(red, green, blue)
+		end
+		return { R = red / 255, G = green / 255, B = blue / 255 }
+	end
+
 	local THEME = {
-		background = Color3.fromRGB(18, 18, 22),
-		surface = Color3.fromRGB(28, 28, 34),
-		surfaceAlt = Color3.fromRGB(36, 36, 44),
-		accent = Color3.fromRGB(120, 170, 255),
-		accentSoft = Color3.fromRGB(46, 66, 104),
-		text = Color3.fromRGB(235, 235, 240),
-		muted = Color3.fromRGB(150, 150, 160),
-		border = Color3.fromRGB(52, 52, 62),
+		background = rgb(18, 18, 22),
+		surface = rgb(28, 28, 34),
+		surfaceAlt = rgb(36, 36, 44),
+		accent = rgb(120, 170, 255),
+		accentSoft = rgb(46, 66, 104),
+		text = rgb(235, 235, 240),
+		muted = rgb(150, 150, 160),
+		border = rgb(52, 52, 62),
 	}
 
 	local function new(className, properties)
@@ -10201,16 +10210,6 @@ return function(MOD)
 	local Players = game:GetService("Players")
 
 	------------------------------------------------------------------
-	-- Single instance guard
-	------------------------------------------------------------------
-
-	local genv = (getgenv and getgenv()) or _G
-	if genv.AOTRSuite and genv.AOTRSuite.Running then
-		Util.warn("AOTRSuite is already running.")
-		return nil
-	end
-
-	------------------------------------------------------------------
 	-- Context
 	------------------------------------------------------------------
 	-- The context is filled in step by step. Every module receives the
@@ -10218,14 +10217,30 @@ return function(MOD)
 	-- order below does not have to be perfect.
 
 	local Ctx = {
-		Util = Util,
-		Rayfield = MOD.Rayfield,
 		state = {},
 	}
+
+	-- The utilities are the base of everything else, so they are built
+	-- first. Every module reaches them through the context, which means
+	-- the context has to hold the built table and never the factory.
+	Ctx.Util = MOD.Util(Ctx)
+	Ctx.Rayfield = MOD.Rayfield
+
+	local Util = Ctx.Util
 
 	local function build(name)
 		Ctx[name] = MOD[name](Ctx)
 		return Ctx[name]
+	end
+
+	------------------------------------------------------------------
+	-- Single instance guard
+	------------------------------------------------------------------
+
+	local genv = (getgenv and getgenv()) or _G
+	if genv.AOTRSuite and genv.AOTRSuite.Running then
+		Util.warn("AOTRSuite is already running.")
+		return nil
 	end
 
 	build("Config")

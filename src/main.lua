@@ -12,16 +12,6 @@ return function(MOD)
 	local Players = game:GetService("Players")
 
 	------------------------------------------------------------------
-	-- Single instance guard
-	------------------------------------------------------------------
-
-	local genv = (getgenv and getgenv()) or _G
-	if genv.AOTRSuite and genv.AOTRSuite.Running then
-		Util.warn("AOTRSuite is already running.")
-		return nil
-	end
-
-	------------------------------------------------------------------
 	-- Context
 	------------------------------------------------------------------
 	-- The context is filled in step by step. Every module receives the
@@ -29,14 +19,30 @@ return function(MOD)
 	-- order below does not have to be perfect.
 
 	local Ctx = {
-		Util = Util,
-		Rayfield = MOD.Rayfield,
 		state = {},
 	}
+
+	-- The utilities are the base of everything else, so they are built
+	-- first. Every module reaches them through the context, which means
+	-- the context has to hold the built table and never the factory.
+	Ctx.Util = MOD.Util(Ctx)
+	Ctx.Rayfield = MOD.Rayfield
+
+	local Util = Ctx.Util
 
 	local function build(name)
 		Ctx[name] = MOD[name](Ctx)
 		return Ctx[name]
+	end
+
+	------------------------------------------------------------------
+	-- Single instance guard
+	------------------------------------------------------------------
+
+	local genv = (getgenv and getgenv()) or _G
+	if genv.AOTRSuite and genv.AOTRSuite.Running then
+		Util.warn("AOTRSuite is already running.")
+		return nil
 	end
 
 	build("Config")

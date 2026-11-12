@@ -618,6 +618,65 @@ check("report lists the errors", report:find("something went wrong", 1, true) ~=
 check("errors are counted", #Diagnostics.state.errors == 1)
 
 --------------------------------------------------------------------------------
+-- The wiring of main.lua
+--------------------------------------------------------------------------------
+
+section("Wiring")
+-- main.lua builds every module and puts it into the context. A module
+-- that is referenced but never built is a factory function instead of a
+-- table, which only fails at runtime inside the game.
+local MODULES = {
+	"Util",
+	"Config",
+	"Remotes",
+	"GameUI",
+	"Targets",
+	"Stats",
+	"Safety",
+	"Webhook",
+	"Features/Farm",
+	"Features/Combat",
+	"Features/Reload",
+	"Features/Claim",
+	"Features/Boosts",
+	"Features/AutoStart",
+	"Features/Waves",
+	"Features/ShadowBan",
+	"FallbackUI",
+	"Diagnostics",
+	"Hub",
+}
+
+local registry = {}
+for _, name in ipairs(MODULES) do
+	registry[name] = loadModule("../src/" .. name)
+end
+
+local wiringCtx = { state = {} }
+wiringCtx.Util = registry.Util(wiringCtx)
+wiringCtx.Rayfield = {}
+for _, name in ipairs(MODULES) do
+	if name ~= "Util" then
+		wiringCtx[name] = registry[name](wiringCtx)
+	end
+end
+
+for _, name in ipairs(MODULES) do
+	local value = wiringCtx[name]
+	check(name .. " is a table, not a factory", type(value) == "table", type(value))
+end
+
+check("the context holds the built utilities", type(wiringCtx.Util.deepCopy) == "function")
+check("the context holds the built config", type(wiringCtx.Config.Get) == "function")
+check("the context holds the built remotes", type(wiringCtx.Remotes.post) == "function")
+check("the context holds the built interface", type(wiringCtx.Hub.build) == "function")
+check("the context holds the built diagnostics", type(wiringCtx.Diagnostics.report) == "function")
+
+-- The utilities have to work when they are reached through the context.
+local merged = wiringCtx.Util.deepMerge({ a = 1 }, { b = 2 })
+check("the context utilities merge tables", merged.a == 1 and merged.b == 2)
+
+--------------------------------------------------------------------------------
 -- Result
 --------------------------------------------------------------------------------
 
