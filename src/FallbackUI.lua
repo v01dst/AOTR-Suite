@@ -341,12 +341,21 @@ return function(Ctx)
 			return textLabel
 		end
 
-		tab = {}
+		-- The original tab creator is kept, makeTab extends it with the
+		-- controls and the new creator below points at makeTab.
 		local createTab = window.CreateTab
 
 		-- Sections and controls are created through the tab object.
 		local function makeTab(name)
 			local tabObject = createTab(window, name)
+
+			-- The rows keep the order they were created in, the section
+			-- headers stay above the controls that belong to them.
+			local layoutOrder = 0
+			local function nextOrder()
+				layoutOrder = layoutOrder + 1
+				return layoutOrder
+			end
 
 			tabObject.CreateSection = function(_, sectionName)
 				local sectionLabel = new("TextLabel", {
@@ -358,14 +367,14 @@ return function(Ctx)
 					Size = UDim2.new(1, -8, 0, 18),
 				})
 				sectionLabel.Parent = tabObject.page
-				sectionLabel.LayoutOrder = 0
+				sectionLabel.LayoutOrder = nextOrder()
 				return sectionLabel
 			end
 
 			tabObject.CreateToggle = function(_, toggleSettings)
 				toggleSettings = toggleSettings or {}
 				local frame = row(tabObject.page, 30)
-				frame.LayoutOrder = 1
+				frame.LayoutOrder = nextOrder()
 
 				local box = new("TextButton", {
 					BackgroundColor3 = THEME.surfaceAlt,
@@ -413,7 +422,7 @@ return function(Ctx)
 			tabObject.CreateDropdown = function(_, dropdownSettings)
 				dropdownSettings = dropdownSettings or {}
 				local frame = row(tabObject.page, 30)
-				frame.LayoutOrder = 1
+				frame.LayoutOrder = nextOrder()
 
 				local options = dropdownSettings.Options or {}
 				local current = dropdownSettings.CurrentOption
@@ -478,7 +487,7 @@ return function(Ctx)
 				local range = sliderSettings.Range or { 0, 100 }
 				local increment = sliderSettings.Increment or 1
 				local frame = row(tabObject.page, 30)
-				frame.LayoutOrder = 1
+				frame.LayoutOrder = nextOrder()
 
 				local text = label(frame, sliderSettings.Name or "", 120)
 				local value = sliderSettings.CurrentValue or range[1]
@@ -536,7 +545,7 @@ return function(Ctx)
 			tabObject.CreateInput = function(_, inputSettings)
 				inputSettings = inputSettings or {}
 				local frame = row(tabObject.page, 30)
-				frame.LayoutOrder = 1
+				frame.LayoutOrder = nextOrder()
 
 				local text = label(frame, inputSettings.Name or "", 150)
 
@@ -579,7 +588,7 @@ return function(Ctx)
 					AutoButtonColor = false,
 				})
 				frame.Parent = tabObject.page
-				frame.LayoutOrder = 1
+				frame.LayoutOrder = nextOrder()
 				corner(frame, 5)
 				frame.MouseButton1Click:Connect(function()
 					if buttonSettings.Callback then
@@ -597,7 +606,7 @@ return function(Ctx)
 					AutomaticSize = Enum.AutomaticSize.Y,
 				})
 				frame.Parent = tabObject.page
-				frame.LayoutOrder = 1
+				frame.LayoutOrder = nextOrder()
 
 				local title = new("TextLabel", {
 					BackgroundTransparency = 1,
