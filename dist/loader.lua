@@ -17,8 +17,10 @@ local __AOTRLoader = (function()
 	AOTR Suite :: Loader
 	Loads the bundled script from a URL or from a local file.
 
-	dist\loader.lua is generated from this module, so the loader stays
-	testable and the shipped file stays a single pasteable chunk.
+	The loader draws its own small window on the screen, because some
+	executors swallow print output and patch the notification api. The
+	window lists every attempt so a failed download is visible instead of
+	silent.
 ]]
 
 return function(options)
@@ -28,6 +30,14 @@ return function(options)
 	local URLS = options.urls or {}
 	local LOCAL_FILE = options.file or "AOTR.lua"
 	local log = options.log or print
+	local MARKER = options.marker or "AOTR Suite"
+
+	------------------------------------------------------------------
+	-- Output
+	------------------------------------------------------------------
+
+	local status = "starting"
+	local details = {}
 
 	local function report(...)
 		local parts = {}
@@ -37,52 +47,239 @@ return function(options)
 		log("[AOTR Loader] " .. table.concat(parts, " "))
 	end
 
-	-- A toast on the screen, some executors never show print output.
-	local function toast(title, text)
+	------------------------------------------------------------------
+	-- On screen window
+	------------------------------------------------------------------
+
+	local gui = nil
+	local statusLabel = nil
+	local detailsLabel = nil
+
+	local function paint()
+		if not statusLabel then
+			return
+		end
 		pcall(function()
-			game:GetService("StarterGui"):SetCore("SendNotification", {
-				Title = tostring(title),
-				Text = tostring(text),
-				Duration = 6,
-			})
+			statusLabel.Text = status
+			detailsLabel.Text = table.concat(details, "\n")
 		end)
 	end
 
-	local function fromUrl(url)
-		if type(url) ~= "string" or url == "" then
-			return nil
-		end
-		-- game:HttpGet is the first choice, it is the one that works in
-		-- every executor.
-		local ok, source = pcall(function()
-			return game:HttpGet(url)
-		end)
-		if ok and type(source) == "string" and #source > 0 then
-			return source
-		end
+	local function note(line)
+		table.insert(details, line)
+		paint()
+	end
 
-		-- Some executors patch game:HttpGet, their own http client still
-		-- works. This is the usual fix for a script that stays empty.
-		local request = (syn and syn.request)
-			or (fluxus and fluxus.request)
-			or (http and http.request)
-			or (krnl and krnl.request)
-			or (delta and delta.request)
-			or http_request
-			or request
-		if type(request) == "function" then
-			local requestOk, response = pcall(request, {
-				Url = url,
-				Method = "GET",
-			})
-			if requestOk and type(response) == "table" then
-				local body = response.Body or response.body or response.Text
-				if type(body) == "string" and #body > 0 then
-					return body
+	local function buildGui()
+		if gui then
+			return
+		end
+		local ok, host = pcall(function()
+			return (gethui and gethui()) or game:GetService("CoreGui")
+		end)
+		if not ok or not host then
+			host = game:GetService("CoreGui")
+		end
+		-- A ScreenGui cannot hold another ScreenGui.
+		pcall(function()
+			if host:IsA("ScreenGui") then
+				host = host.Parent or game:GetService("CoreGui")
+			end
+		end)
+
+		local created = pcall(function()
+			gui = Instance.new("ScreenGui")
+			gui.Name = "AOTRLoaderUI"
+			gui.ResetOnSpawn = false
+			gui.DisplayOrder = 9999
+			gui.IgnoreGuiInset = false
+			gui.Parent = host
+
+			local frame = Instance.new("Frame")
+			frame.Size = UDim2.fromOffset(430, 190)
+			frame.Position = UDim2.fromScale(0.5, 0.5)
+			frame.AnchorPoint = Vector2.new(0.5, 0.5)
+			frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+			frame.BorderSizePixel = 0
+			frame.Parent = gui
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 8)
+			corner.Parent = frame
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(52, 52, 62)
+			stroke.Thickness = 1
+			stroke.Parent = frame
+
+			local title = Instance.new("TextLabel")
+			title.BackgroundTransparency = 1
+			title.Text = "AOTR Loader"
+			title.TextColor3 = Color3.fromRGB(235, 235, 240)
+			title.TextSize = 15
+			title.TextXAlignment = Enum.TextXAlignment.Left
+			title.Size = UDim2.new(1, -24, 0, 24)
+			title.Position = UDim2.fromOffset(12, 8)
+			title.Parent = frame
+
+			statusLabel = Instance.new("TextLabel")
+			statusLabel.BackgroundTransparency = 1
+			statusLabel.Text = "starting"
+			statusLabel.TextColor3 = Color3.fromRGB(120, 170, 255)
+			statusLabel.TextSize = 13
+			statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+			statusLabel.Size = UDim2.new(1, -24, 0, 20)
+			statusLabel.Position = UDim2.fromOffset(12, 34)
+			statusLabel.Parent = frame
+
+			detailsLabel = Instance.new("TextLabel")
+			detailsLabel.BackgroundTransparency = 1
+			detailsLabel.Text = ""
+			detailsLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+			detailsLabel.TextSize = 11
+			detailsLabel.TextXAlignment = Enum.TextXAlignment.Left
+			detailsLabel.TextYAlignment = Enum.TextYAlignment.Top
+			detailsLabel.TextWrapped = true
+			detailsLabel.Size = UDim2.new(1, -24, 1, -62)
+			detailsLabel.Position = UDim2.fromOffset(12, 58)
+			detailsLabel.Parent = frame
+		end)
+		if not created then
+			gui = nil
+			statusLabel = nil
+		end
+	end
+
+	local function setStatus(text)
+		status = text
+		paint()
+	end
+
+	------------------------------------------------------------------
+	-- Executor detection
+	------------------------------------------------------------------
+
+	local function detectExecutor()
+		local names = {}
+		local function push(name)
+			table.insert(names, name)
+		end
+		pcall(function()
+			if syn then
+				push("Synapse")
+			end
+		end)
+		pcall(function()
+			if fluxus then
+				push("Fluxus")
+			end
+		end)
+		pcall(function()
+			if krnl then
+				push("Krnl")
+			end
+		end)
+		pcall(function()
+			if delta then
+				push("Delta")
+			end
+		end)
+		pcall(function()
+			if getexecutorname then
+				local ok, name = pcall(getexecutorname)
+				if ok and type(name) == "string" then
+					push(name)
 				end
 			end
+		end)
+		pcall(function()
+			if identifier then
+				local ok, name = pcall(identifier)
+				if ok and type(name) == "string" then
+					push(name)
+				end
+			end
+		end)
+		if #names == 0 then
+			return "unknown"
 		end
+		return table.concat(names, ", ")
+	end
 
+	------------------------------------------------------------------
+	-- Download attempts
+	------------------------------------------------------------------
+
+	-- A source that is not the script is useless, the marker is checked
+	-- so a html error page is not compiled.
+	local function looksValid(source)
+		if type(source) ~= "string" or #source < 100 then
+			return false
+		end
+		return string.find(source, MARKER, 1, true) ~= nil
+	end
+
+	local function tryGameHttpGet(url)
+		local ok, result = pcall(function()
+			return game:HttpGet(url)
+		end)
+		if ok and type(result) == "string" and #result > 0 then
+			return result, "game:HttpGet"
+		end
+		local ok2, result2 = pcall(function()
+			return game.HttpGet(game, url)
+		end)
+		if ok2 and type(result2) == "string" and #result2 > 0 then
+			return result2, "game.HttpGet"
+		end
+		return nil, "game:HttpGet"
+	end
+
+	-- Every known name of the executor http client.
+	local function requestClients()
+		local clients = {}
+		local function push(name, fn)
+			if type(fn) == "function" then
+				table.insert(clients, { name = name, fn = fn })
+			end
+		end
+		pcall(function()
+			push("syn.request", syn and syn.request)
+		end)
+		pcall(function()
+			push("fluxus.request", fluxus and fluxus.request)
+		end)
+		pcall(function()
+			push("http.request", http and http.request)
+		end)
+		pcall(function()
+			push("krnl.request", krnl and krnl.request)
+		end)
+		pcall(function()
+			push("delta.request", delta and delta.request)
+		end)
+		pcall(function()
+			push("http_request", http_request)
+		end)
+		pcall(function()
+			push("request", request)
+		end)
+		pcall(function()
+			push("httpRequest", httpRequest)
+		end)
+		return clients
+	end
+
+	local function tryRequest(client, url)
+		local ok, response = pcall(client.fn, {
+			Url = url,
+			Method = "GET",
+		})
+		if not ok or type(response) ~= "table" then
+			return nil
+		end
+		local body = response.Body or response.body or response.Text or response.text
+		if type(body) == "string" and #body > 0 then
+			return body
+		end
 		return nil
 	end
 
@@ -98,50 +295,80 @@ return function(options)
 	end
 
 	------------------------------------------------------------------
-	-- Single instance guard
+	-- Run
 	------------------------------------------------------------------
+
+	buildGui()
+	setStatus("looking for the script")
+	note("executor: " .. tostring(options.executor or detectExecutor()))
+
 	local genv = (getgenv and getgenv()) or _G
 	if genv.AOTRSuite and genv.AOTRSuite.Running then
+		setStatus("already running")
+		note("the suite is already running")
 		report("the suite is already running, nothing to do")
 		return { loaded = false, reason = "already running" }
 	end
 
 	if game.GameId ~= GAME_ID then
-		report("warning: this script is built for Attack on Titan: Revolution")
-		report("expected GameId " .. tostring(GAME_ID) .. ", got " .. tostring(game.GameId))
+		note("warning: expected GameId " .. tostring(GAME_ID) .. ", got " .. tostring(game.GameId))
 	end
 
-	------------------------------------------------------------------
-	-- Find the source
-	------------------------------------------------------------------
 	local source = nil
 	local origin = nil
 
 	for _, url in ipairs(URLS) do
-		source = fromUrl(url)
+		setStatus("downloading")
+		local body, how = tryGameHttpGet(url)
+		if body and looksValid(body) then
+			source = body
+			origin = url .. " (" .. how .. ")"
+			break
+		end
+		note("failed: " .. tostring(how) .. " -> " .. tostring(body and ("unexpected content, " .. #body .. " bytes") or "no response"))
+
+		for _, client in ipairs(requestClients()) do
+			local result = tryRequest(client, url)
+			if result and looksValid(result) then
+				source = result
+				origin = url .. " (" .. client.name .. ")"
+				break
+			end
+			if result then
+				note("failed: " .. client.name .. " -> unexpected content, " .. tostring(#result) .. " bytes")
+			else
+				note("failed: " .. client.name .. " -> no response")
+			end
+		end
 		if source then
-			origin = url
 			break
 		end
 	end
 
+	-- The local file is the fallback, it also works without a network.
 	if not source then
-		source = fromFile(LOCAL_FILE)
-		if source then
+		local file = fromFile(LOCAL_FILE)
+		if file and looksValid(file) then
+			source = file
 			origin = "local file: " .. LOCAL_FILE
+		elseif file then
+			note("the local file is not the script, " .. tostring(#file) .. " bytes")
+		else
+			note("no local file: " .. LOCAL_FILE)
 		end
 	end
 
 	if not source then
-		report("no source found.")
-		report("put the URL of your hosted AOTR.lua into the url list,")
-		report("or place AOTR.lua in the executor folder as " .. LOCAL_FILE .. ".")
-		toast("AOTR Loader", "No source found. Check the link or place AOTR.lua next to the loader.", 8)
+		setStatus("no source found")
+		note("tried " .. tostring(#URLS) .. " url(s) and the local file")
+		note("put AOTR.lua next to the loader, or fix the url")
+		report("no source found")
 		return { loaded = false, reason = "no source" }
 	end
 
+	setStatus("loaded " .. tostring(#source) .. " bytes")
+	note("source: " .. tostring(origin))
 	report("source: " .. tostring(origin) .. " (" .. tostring(#source) .. " bytes)")
-	toast("AOTR Loader", "Downloaded " .. tostring(#source) .. " bytes, starting...", 4)
 
 	-- Cache the script so the next run works without a network.
 	if type(writefile) == "function" and LOCAL_FILE ~= "" then
@@ -150,24 +377,37 @@ return function(options)
 		end)
 	end
 
-	------------------------------------------------------------------
-	-- Run
-	------------------------------------------------------------------
+	setStatus("starting the suite")
 	local chunk, compileError = loadstring(source, "@AOTR")
 	if not chunk then
+		setStatus("compile failed")
+		note("compile error: " .. tostring(compileError))
 		report("compile failed: " .. tostring(compileError))
 		return { loaded = false, reason = "compile error" }
 	end
 
 	local ok, runtimeError = pcall(chunk)
 	if not ok then
+		setStatus("runtime error")
+		note("runtime error: " .. tostring(runtimeError))
 		report("runtime error: " .. tostring(runtimeError))
-		toast("AOTR Loader", "Runtime error, check the diagnostics tab.", 8)
 		return { loaded = false, reason = "runtime error" }
 	end
 
+	setStatus("the suite is running")
+	note("done")
 	report("done")
-	toast("AOTR Suite", "Loaded.", 5)
+
+	-- Hand the window over to the suite, it shows its own interface.
+	task.spawn(function()
+		task.wait(2)
+		pcall(function()
+			if gui then
+				gui:Destroy()
+			end
+		end)
+	end)
+
 	return { loaded = true, source = source }
 end
 

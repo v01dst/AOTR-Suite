@@ -543,10 +543,16 @@ local function quiet(...)
 	end
 end
 
+-- A stand in for the real script, it has to look like one because the
+-- loader rejects anything that is not the script.
+local function fakeSource(flag)
+	return "-- AOTR Suite\n-- " .. string.rep("x", 120) .. "\n" .. flag .. " = true\n"
+end
+
 -- The loader fetches over http first.
 mockGame.HttpGet = function(_, url)
 	if url == "https://example.test/aotr.lua" then
-		return "loadedFromUrl = true"
+		return fakeSource("loadedFromUrl")
 	end
 	error("404")
 end
@@ -556,7 +562,7 @@ check("loader reports the origin", urlResult.source ~= nil)
 
 -- Then it falls back to the local file.
 loadedFromUrl = nil
-filesApi.writefile("AOTR.lua", "loadedFromFile = true")
+filesApi.writefile("AOTR.lua", fakeSource("loadedFromFile"))
 local fileResult = Loader({ urls = { "https://example.test/missing.lua" }, file = "AOTR.lua", log = quiet })
 check("loader falls back to the local file", fileResult.loaded == true and loadedFromFile == true, tostring(fileResult.reason))
 
@@ -564,11 +570,16 @@ check("loader falls back to the local file", fileResult.loaded == true and loade
 local emptyResult = Loader({ urls = {}, file = "does-not-exist.lua", log = quiet })
 check("loader reports a missing source", emptyResult.loaded == false and emptyResult.reason == "no source")
 
+-- A page that is not the script is rejected instead of being compiled.
+filesApi.writefile("AOTR.lua", "<html><body>404 not found</body></html>")
+local htmlResult = Loader({ urls = {}, file = "AOTR.lua", log = quiet })
+check("loader rejects a page that is not the script", htmlResult.loaded == false and htmlResult.reason == "no source")
+
 -- When game:HttpGet is patched the executor http client is used instead.
 local requestedUrl = nil
 request = function(options)
 	requestedUrl = options and options.Url
-	return { Body = "loadedFromRequest = true", StatusCode = 200 }
+	return { Body = fakeSource("loadedFromRequest"), StatusCode = 200 }
 end
 loadedFromRequest = nil
 local requestResult = Loader({ urls = { "https://example.test/patched.lua" }, file = "missing.lua", log = quiet })
@@ -577,7 +588,7 @@ check("the executor http client got the url", requestedUrl == "https://example.t
 request = nil
 
 -- A broken source is reported and does not crash the loader.
-filesApi.writefile("AOTR.lua", "this is not lua ===")
+filesApi.writefile("AOTR.lua", "-- AOTR Suite\n" .. string.rep("x", 120) .. "\nthis is not lua ===")
 local brokenResult = Loader({ urls = {}, file = "AOTR.lua", log = quiet })
 check("loader survives a broken source", brokenResult.loaded == false, tostring(brokenResult.reason))
 
