@@ -1,0 +1,13 @@
+--[[
+	AOTR Suite :: loader
+	========================================================================
+
+	الصق هذا الملف في الـ executor ونفّذه.
+
+	يبحث عن السكربت بالترتيب:
+		1. من أول رابط يعمل في قائمة urls
+		2. من ملف AOTR.lua الموجود في مجلد الـ executor (workspace)
+
+	Usage:
+		loadstring(readfile("AOTR.lua"))()   -- when the file sits next to it
+]]

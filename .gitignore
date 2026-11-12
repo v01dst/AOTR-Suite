@@ -1,0 +1,16 @@
+# Build output is committed on purpose, the executor needs a single file.
+# dist\*.tmp
+
+# The Luau toolchain, it is a 10 MB binary download.
+tools/luau/
+tools/*.zip
+
+# Research clones of other projects, they are not part of this project.
+upstream/
+
+# Editor and system noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
