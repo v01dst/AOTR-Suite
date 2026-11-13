@@ -1,0 +1,26 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Luau 0.746
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/luau-lang/luau/releases/download/0.746/luau-windows.zip" -OutFile "$env:RUNNER_TEMP\luau-windows.zip"
+          New-Item -ItemType Directory -Force -Path "tools\luau" | Out-Null
+          Expand-Archive -Path "$env:RUNNER_TEMP\luau-windows.zip" -DestinationPath "tools\luau" -Force
+      - name: Build
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File tools\build.ps1
+      - name: Check
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File tools\check.ps1
+      - name: Test
+        shell: powershell
+        run: .\tools\luau\luau.exe .\tools\test.lua
